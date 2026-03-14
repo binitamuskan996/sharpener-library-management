@@ -16,7 +16,7 @@ This project is a capstone project to demonstrate full-stack backend and fronten
 ```
 /models        - Sequelize models (User, Book, BookIssue)
 /controllers   - API logic (Books, Admin, Auth)
-/routes        - Routes for admin,book and auth
+/routes        - Routes for admin, book and auth
 /middleware    - JWT authentication middleware
 /public        - Frontend HTML, CSS, JS files
 /utils         - Utility functions
@@ -68,9 +68,7 @@ npm install
 
 3. **Configure the database:**
 
-Open the file `/utils/db-connection` and update it with your MySQL credentials:
-
-```
+Open the file `/utils/db-connection` and update it with your MySQL credentials.
 
 > **Note:** The JWT secret is configured directly in the middleware. If you want to change it, update the `JWT_SECRET` value in `/middleware/auth.js`.
 
@@ -82,14 +80,6 @@ npm start
 5. **Open the frontend in your browser:**
    - `admin.html` — Admin Panel
    - `login.html` — User Panel
-
----
-
-## 📸 Screenshots
-
-- Admin Dashboard
-- User Panel
-- Issued Books & Fine Report
 
 ---
 
