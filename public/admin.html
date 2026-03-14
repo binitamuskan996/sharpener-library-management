@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Panel</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        body {
+            font-family: Arial;
+            background: #f4f6f9;
+            padding: 30px;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            margin-top: 40px;
+        }
+
+        input {
+            padding: 7px;
+            margin-right: 5px;
+        }
+
+        button {
+            padding: 6px 10px;
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        .logout {
+            background: red;
+            float: right;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: center;
+        }
+
+        th {
+            background: #eee;
+        }
+    </style>
+</head>
+
+<body>
+    <button class="logout" onclick="logout()">Logout</button>
+    <h1>Admin Dashboard</h1>
+    <h2>Add Book</h2>
+    <input id="bookName" placeholder="Book Name">
+    <input id="author" placeholder="Author">
+    <input id="copies" placeholder="Available Copies">
+    <button onclick="addBook()">Add Book</button>
+    <h2>All Books</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Book Name</th>
+                <th>Author</th>
+                <th>Available Copies</th>
+                <th>Edit</th>
+                <th>Delete</th>
+            </tr>
+        </thead>
+        <tbody id="books"></tbody>
+    </table>
+    <h2>Issued Books</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>User</th>
+                <th>Email</th>
+                <th>Book</th>
+                <th>Issued Time</th>
+                <th>Current Fine</th>
+            </tr>
+        </thead>
+        <tbody id="issued"></tbody>
+    </table>
+    <h2>Returned Books (Fine Report)</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>User</th>
+                <th>Email</th>
+                <th>Book</th>
+                <th>Issued Time</th>
+                <th>Returned Time</th>
+                <th>Fine</th>
+            </tr>
+        </thead>
+        <tbody id="returned"></tbody>
+    </table>
+    <h2>Users</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Change Role</th>
+            </tr>
+        </thead>
+        <tbody id="users"></tbody>
+    </table>
+    <script>
+        const token = localStorage.getItem("token");
+
+        async function addBook() {
+            try {
+                const res = await axios.post("http://localhost:3000/admin/add-books", {
+                    bookName: bookName.value,
+                    author: author.value,
+                    totalCopies: copies.value
+                }, { headers: { authorization: token } });
+                alert("Book Added");
+                bookName.value = ""; author.value = ""; copies.value = "";
+                await loadBooks();
+            } catch (err) {
+                alert(err.response?.data?.message || "Error adding book");
+            }
+        }
+
+        async function loadBooks() {
+            try {
+                const res = await axios.get("http://localhost:3000/admin/get-books", { headers: { authorization: token } });
+                books.innerHTML = "";
+                res.data.forEach(b => {
+                    books.innerHTML += `<tr>
+<td>${b.id}</td>
+<td>${b.bookName}</td>
+<td>${b.author}</td>
+<td>${b.availableCopies}</td>
+<td><button onclick="editBook(${b.id})">Edit</button></td>
+<td><button onclick="deleteBook(${b.id})" style="background:red">Delete</button></td>
+</tr>`;
+                });
+            } catch (err) {
+                alert("Error loading books");
+            }
+        }
+
+        async function editBook(id) {
+            try {
+                const newCopies = prompt("Enter new copies");
+                if (newCopies === null) return;
+                await axios.put(`http://localhost:3000/admin/update-book/${id}`, { availableCopies: newCopies }, { headers: { authorization: token } });
+                alert("Book Updated");
+                await loadBooks();
+            } catch (err) {
+                alert(err.response?.data?.message || "Error updating book");
+            }
+        }
+
+        async function deleteBook(id) {
+            try {
+                if (!confirm("Delete this book?")) return;
+                await axios.delete(`http://localhost:3000/admin/delete-book/${id}`, { headers: { authorization: token } });
+                alert("Book Deleted");
+                await loadBooks();
+            } catch (err) {
+                alert(err.response?.data?.message || "Error deleting book");
+            }
+        }
+
+        async function loadIssued() {
+            try {
+                const res = await axios.get("http://localhost:3000/admin/issue-report", { headers: { authorization: token } });
+                issued.innerHTML = "";
+                res.data.forEach(r => {
+                    issued.innerHTML += `<tr>
+<td>${r.userName}</td>
+<td>${r.email}</td>
+<td>${r.bookName}</td>
+<td>${new Date(r.issuedAt).toLocaleString()}</td>
+<td>₹${r.fine}</td>
+</tr>`;
+                });
+            } catch (err) {
+                alert("Error loading issued books");
+            }
+        }
+
+        async function loadReturned() {
+            try {
+                const res = await axios.get("http://localhost:3000/admin/fine-report", { headers: { authorization: token } });
+                returned.innerHTML = "";
+                res.data.forEach(r => {
+                    returned.innerHTML += `<tr>
+<td>${r.User.name}</td>
+<td>${r.User.email}</td>
+<td>${r.Book.bookName}</td>
+<td>${new Date(r.issuedAt).toLocaleString()}</td>
+<td>${new Date(r.returnedOn).toLocaleString()}</td>
+<td>₹${r.fine}</td>
+</tr>`;
+                });
+            } catch (err) {
+                alert("Error loading returned books");
+            }
+        }
+
+        async function loadUsers() {
+            try {
+                const res = await axios.get("http://localhost:3000/admin/users", { headers: { authorization: token } });
+                users.innerHTML = "";
+                res.data.forEach(u => {
+                    users.innerHTML += `<tr>
+<td>${u.id}</td>
+<td>${u.name}</td>
+<td>${u.email}</td>
+<td>${u.role}</td>
+<td>
+<button onclick="changeRole(${u.id},'admin')">Make Admin</button>
+<button onclick="changeRole(${u.id},'user')">Make User</button>
+</td>
+</tr>`;
+                });
+            } catch (err) {
+                alert("Error loading users");
+            }
+        }
+
+        async function changeRole(id, role) {
+            try {
+                await axios.put("http://localhost:3000/admin/change-role", { userId: id, role: role }, { headers: { authorization: token } });
+                alert("Role Updated");
+                await loadUsers();
+            } catch (err) {
+                alert(err.response?.data?.message || "Error changing role");
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem("token");
+            window.location = "login.html";
+        }
+
+        loadBooks();
+        loadIssued();
+        loadReturned();
+        loadUsers();
+    </script>
+</body>
+
+</html>

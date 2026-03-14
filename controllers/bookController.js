@@ -1,43 +1,29 @@
-const Books = require('../models/bookModel');
 const { Op } = require('sequelize');
-
+const Book = require('../models/bookModel');
+const BookIssue = require('../models/bookIssueModel');
 
 const getReturnedBooks = async (req, res) => {
   try {
-    const books = await Books.findAll({
+    const books = await BookIssue.findAll({
       where: {
-        returnedOn: {
-          [Op.not]: null
-        }
-      }
+        returnedOn: { [Op.not]: null },
+        UserId: req.user.id
+      },
+      include: [{ model: Book, attributes: ["bookName"] }]
     });
-    res.status(200).json(books);
+
+    const result = books.map(b => ({
+      id: b.id,
+      bookName: b.Book.bookName,
+      issuedAt: b.issuedAt,
+      returnedOn: b.returnedOn,
+      fine: b.fine
+    }));
+
+    res.json(result);
   } catch (err) {
-    res.status(500).send(err.message);
-  }
-};
-
-const getIssuedBooks = async (req, res) => {
-  try {
-    const books = await Books.findAll({
-      where: {
-        returnedOn: null
-      }
-    });
- const now = new Date();
-
-    const booksWithFine = books.map(book => {
-      const hours = Math.ceil((now - new Date(book.issuedAt)) / (60*60*1000));
-      const fine = hours > 1 ? (hours - 1) * 10 : 0;
-      return {
-        ...book.dataValues,
-        fine
-      };
-    });
-
-    res.status(200).json(booksWithFine); 
- } catch (err) {
-    res.status(500).send(err.message);
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -45,23 +31,18 @@ const returnedBook = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const book = await Books.findByPk(id);
-    if (!book) {
-      return res.status(404).json({ message: 'Book not found' });
+    const issue = await BookIssue.findByPk(id);
+    if (!issue) {
+      return res.status(404).json({ message: 'Book issue not found' });
     }
 
-    const hours = Math.ceil(
-      (new Date() - new Date(book.issuedAt)) / (60 * 60 * 1000)
-    );
-
+    const hours = Math.ceil((new Date() - new Date(issue.issuedAt)) / (60 * 60 * 1000));
     const fine = hours > 1 ? (hours - 1) * 10 : 0;
 
-    res.json({
-      id: book.id,
-      fine
-    });
+    res.json({ id: issue.id, fine });
   } catch (err) {
-    res.status(500).send(err.message);
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -69,48 +50,95 @@ const payFine = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const book = await Books.findByPk(id);
-    if (!book) {
-      return res.status(404).json({ message: 'Book not found' });
-    }
-    const hours = Math.ceil((new Date() - new Date(book.issuedAt)) / (60*60*1000));
+    const issue = await BookIssue.findByPk(id);
+    if (!issue) return res.status(404).json({ message: "Book issue not found" });
+
+    const hours = Math.ceil((new Date() - new Date(issue.issuedAt)) / (60 * 60 * 1000));
     const fine = hours > 1 ? (hours - 1) * 10 : 0;
-    book.fine = fine;
-    book.returnedOn = new Date();
 
-    await book.save();
+    issue.fine = fine;
+    issue.returnedOn = new Date();
+    await issue.save();
 
-    res.json({
-      message: 'Book returned successfully',
-      book
-    });
+    const book = await Book.findByPk(issue.BookId);
+    if (book) {
+      book.availableCopies += 1;
+      await book.save();
+    }
+
+    res.json({ message: "Book returned", fine });
   } catch (err) {
-    res.status(500).send(err.message);
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
 const issueBook = async (req, res) => {
   try {
-    const { bookName } = req.body;
-const issuedAt=new Date();
- const returnedAt=new Date(issuedAt.getTime() + 60 * 60 * 1000);
-    const book = await Books.create({
-      bookName,
-      issuedAt: issuedAt,
-      returnedAt:returnedAt,
-      fine: 0
+    const { bookId } = req.body;
+
+    const book = await Book.findByPk(bookId);
+    if (!book) return res.status(404).json({ message: "Book not found" });
+    if (book.availableCopies <= 0) return res.status(400).json({ message: "No copies available" });
+
+    const issue = await BookIssue.create({
+      BookId: bookId,
+      UserId: req.user.id,
+      issuedAt: new Date()
     });
 
-    res.status(201).json(book);
+    book.availableCopies -= 1;
+    await book.save();
+
+    res.json(issue);
   } catch (err) {
-    res.status(500).send(err.message);
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const getAllBooks = async (req, res) => {
+  try {
+    const books = await Book.findAll();
+    res.json(books);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const myBooks = async (req, res) => {
+  try {
+    const books = await BookIssue.findAll({
+      where: { UserId: req.user.id, returnedOn: null },
+      include: [{ model: Book, attributes: ["bookName"] }]
+    });
+    res.json(books);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const searchBooks = async (req, res) => {
+  try {
+    const { q } = req.query;
+    const books = await Book.findAll({
+      where: { bookName: { [Op.like]: `%${q}%` } }
+    });
+    res.json(books);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
 module.exports = {
   getReturnedBooks,
-  getIssuedBooks,
   returnedBook,
   payFine,
-  issueBook
+  issueBook,
+  getAllBooks,
+  myBooks,
+  searchBooks
 };

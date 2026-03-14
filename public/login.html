@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Library Login</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        body {
+            font-family: Arial;
+            background: #f2f2f2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            width: 320px;
+            border-radius: 6px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        input {
+            width: 100%;
+            padding: 8px;
+            margin-top: 10px;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 15px;
+            border: none;
+            cursor: pointer;
+        }
+
+        .login-btn {
+            background: #007bff;
+            color: white;
+        }
+
+        .register-btn {
+            background: #28a745;
+            color: white;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>Library Login</h2>
+        <input id="email" placeholder="Email">
+        <input id="password" type="password" placeholder="Password">
+        <button class="login-btn" onclick="login()">Login</button>
+        <button class="register-btn" onclick="goRegister()">Register</button>
+    </div>
+    <script>
+        async function login() {
+            try {
+                const res = await axios.post("http://localhost:3000/auth/login", {
+                    email: email.value,
+                    password: password.value
+                });
+                if (res.data.message) {
+                    alert(res.data.message);
+                    return;
+                }
+                localStorage.setItem("token", res.data.token);
+                if (res.data.role === "admin") {
+                    window.location = "admin.html";
+                } else {
+                    window.location = "user.html";
+                }
+            } catch (err) {
+                alert(err.response?.data?.message || "Server error");
+            }
+        }
+
+        function goRegister() {
+            window.location = "register.html";
+        }
+    </script>
+</body>
+
+</html>
